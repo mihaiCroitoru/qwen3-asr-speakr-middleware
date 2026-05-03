@@ -11,8 +11,8 @@ pydub==0.25.1
 # ML / alignment
 torch==2.4.1
 torchaudio==2.4.1
-transformers==4.45.2
-accelerate==0.34.2
+transformers>=4.51.0
+accelerate>=0.34.2
 
 # Diarization
 pyannote.audio==3.3.2
