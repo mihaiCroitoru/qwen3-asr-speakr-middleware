@@ -66,13 +66,16 @@ def _ext(content_type: str) -> str:
     return mapping.get(content_type, ".audio")
 
 
-async def _chunk_audio(audio_bytes: bytes, tmp_dir: Path, chunk_duration: int) -> list[Path]:
-    import os
+async def _chunk_audio(
+    audio_bytes: bytes, tmp_dir: Path, chunk_duration: int, audio_duration: float
+) -> list[Path]:
+    import math
     input_path = tmp_dir / "input.wav"
     input_path.write_bytes(audio_bytes)
     chunks = []
-    i = 0
-    while True:
+    max_chunks = math.ceil(audio_duration / chunk_duration)
+
+    for i in range(max_chunks):
         chunk_path = tmp_dir / f"chunk_{i:04d}.wav"
         proc = await asyncio.create_subprocess_exec(
             "ffmpeg", "-y",
@@ -85,13 +88,11 @@ async def _chunk_audio(audio_bytes: bytes, tmp_dir: Path, chunk_duration: int) -
             stderr=asyncio.subprocess.DEVNULL,
         )
         await proc.wait()
-        if chunk_path.exists() and chunk_path.stat().st_size > 44:
+        if chunk_path.exists() and chunk_path.stat().st_size > 4096:
             chunks.append(chunk_path)
-            i += 1
         else:
             if chunk_path.exists():
                 chunk_path.unlink()
-            break
     return chunks
 
 
@@ -101,10 +102,11 @@ async def _transcribe_chunked(
     language: Optional[str],
     initial_prompt: Optional[str],
     chunk_duration: int,
+    audio_duration: float,
 ) -> dict:
     with tempfile.TemporaryDirectory() as tmp:
         tmp_dir = Path(tmp)
-        chunks = await _chunk_audio(audio_bytes, tmp_dir, chunk_duration)
+        chunks = await _chunk_audio(audio_bytes, tmp_dir, chunk_duration, audio_duration)
         logger.info(f"Chunked audio into {len(chunks)} x {chunk_duration}s chunks")
 
         all_segments: list[dict] = []
@@ -154,7 +156,8 @@ async def run(
     if use_chunking:
         logger.info(f"Audio {audio_duration:.1f}s — using chunked ASR ({settings.asr_chunk_duration}s chunks)")
         asr_result = await _transcribe_chunked(
-            wav_bytes, filename, language, initial_prompt, settings.asr_chunk_duration
+            wav_bytes, filename, language, initial_prompt,
+            settings.asr_chunk_duration, audio_duration
         )
     else:
         asr_result = await asr_client.transcribe(
