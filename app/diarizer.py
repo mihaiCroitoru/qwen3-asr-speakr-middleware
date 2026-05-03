@@ -24,10 +24,7 @@ def _load_pipeline():
         raise RuntimeError("HF_TOKEN required for pyannote diarization")
 
     logger.info(f"Loading diarization pipeline: {settings.pyannote_model}")
-    _pipeline = Pipeline.from_pretrained(
-        settings.pyannote_model,
-        token=settings.hf_token,
-    )
+    _pipeline = Pipeline.from_pretrained(settings.pyannote_model)
     device = settings.device
     if device == "cuda":
         import torch

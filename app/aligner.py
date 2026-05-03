@@ -1,34 +1,46 @@
 import logging
 import numpy as np
-from typing import Optional
 from app.config import get_settings
 
 logger = logging.getLogger(__name__)
 
-SUPPORTED_LANGUAGES = {"en", "zh", "fr", "de", "ja", "ko", "es", "pt", "it", "ar", "ru"}
+LANGUAGE_MAP = {
+    "en": "English",
+    "zh": "Chinese",
+    "yue": "Cantonese",
+    "fr": "French",
+    "de": "German",
+    "it": "Italian",
+    "ja": "Japanese",
+    "ko": "Korean",
+    "pt": "Portuguese",
+    "ru": "Russian",
+    "es": "Spanish",
+}
 
 _model = None
-_processor = None
 
 
 def _load_model():
-    global _model, _processor
+    global _model
     if _model is not None:
-        return _model, _processor
+        return _model
 
+    from qwen_asr import Qwen3ForcedAligner
     import torch
-    from transformers import AutoProcessor, AutoModelForCTC
 
     settings = get_settings()
     model_id = settings.forced_aligner_model
     device = settings.aligner_device
 
     logger.info(f"Loading ForcedAligner: {model_id} on {device}")
-    _processor = AutoProcessor.from_pretrained(model_id, trust_remote_code=True)
-    _model = AutoModelForCTC.from_pretrained(model_id, trust_remote_code=True).to(device)
-    _model.eval()
+    _model = Qwen3ForcedAligner.from_pretrained(
+        model_id,
+        dtype=torch.float32,
+        device_map=device,
+    )
     logger.info("ForcedAligner loaded")
-    return _model, _processor
+    return _model
 
 
 def _fallback_words(segments: list[dict]) -> list[dict]:
@@ -54,51 +66,27 @@ def align(
     segments: list[dict],
     language: str,
 ) -> list[dict]:
-    if language not in SUPPORTED_LANGUAGES:
+    lang_name = LANGUAGE_MAP.get(language)
+    if lang_name is None:
         logger.warning(f"Language '{language}' not supported by ForcedAligner, using fallback")
         return _fallback_words(segments)
 
     try:
-        import torch
-        model, processor = _load_model()
-        settings = get_settings()
-        device = settings.aligner_device
-
-        # resample to 16kHz if needed
-        if sample_rate != 16000:
-            import torchaudio
-            waveform = torch.tensor(audio_array).unsqueeze(0)
-            waveform = torchaudio.functional.resample(waveform, sample_rate, 16000)
-            audio_array = waveform.squeeze(0).numpy()
-            sample_rate = 16000
-
+        model = _load_model()
         full_text = " ".join(seg["text"].strip() for seg in segments)
 
-        inputs = processor(
-            audio_array,
-            sampling_rate=sample_rate,
+        results = model.align(
+            audio=(audio_array, sample_rate),
             text=full_text,
-            return_tensors="pt",
+            language=lang_name,
         )
-        inputs = {k: v.to(device) for k, v in inputs.items()}
-
-        with torch.no_grad():
-            outputs = model(**inputs)
-
-        # word timestamps from logits
-        word_offsets = processor.decode(
-            outputs.logits.argmax(dim=-1)[0],
-            output_word_offsets=True,
-        ).word_offsets
-
-        time_per_frame = audio_array.shape[-1] / sample_rate / outputs.logits.shape[1]
 
         words = []
-        for wo in word_offsets:
+        for token in results[0]:
             words.append({
-                "word": wo.word,
-                "start": round(wo.start_offset * time_per_frame, 3),
-                "end": round(wo.end_offset * time_per_frame, 3),
+                "word": token.text,
+                "start": round(token.start_time, 3),
+                "end": round(token.end_time, 3),
                 "score": 0.9,
             })
         return words

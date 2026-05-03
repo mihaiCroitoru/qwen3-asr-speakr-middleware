@@ -11,8 +11,9 @@ pydub==0.25.1
 # ML / alignment
 torch==2.4.1
 torchaudio==2.4.1
-git+https://github.com/huggingface/transformers.git
+transformers>=4.40.0
 accelerate>=0.34.2
+qwen-asr
 
 # Diarization
 pyannote.audio==3.3.2
