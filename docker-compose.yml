@@ -1,0 +1,33 @@
+services:
+  qwen3-asr-service:
+    build:
+      context: .
+      args:
+        BUILD_WITH_CUDA: "${BUILD_WITH_CUDA:-false}"
+        # HF_TOKEN: "${HF_TOKEN}"  # uncomment to pre-download ForcedAligner at build time
+    image: qwen3-asr-service:latest
+    container_name: qwen3-asr-service
+    restart: unless-stopped
+    ports:
+      - "${PORT:-9000}:${PORT:-9000}"
+    env_file:
+      - .env
+    volumes:
+      - hf_cache:/app/hf_cache
+    networks:
+      - global-backend
+    # GPU support — uncomment if device=cuda
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
+volumes:
+  hf_cache:
+
+networks:
+  global-backend:
+    external: true
