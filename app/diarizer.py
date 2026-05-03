@@ -26,7 +26,7 @@ def _load_pipeline():
     logger.info(f"Loading diarization pipeline: {settings.pyannote_model}")
     _pipeline = Pipeline.from_pretrained(
         settings.pyannote_model,
-        use_auth_token=settings.hf_token,  # pyannote still accepts this alias
+        token=settings.hf_token,
     )
     device = settings.device
     if device == "cuda":
