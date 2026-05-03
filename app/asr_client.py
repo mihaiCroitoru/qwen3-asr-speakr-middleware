@@ -1,9 +1,40 @@
+import re
 import httpx
 import logging
 from typing import Optional
 from app.config import get_settings
 
 logger = logging.getLogger(__name__)
+
+_LANG_NAME_TO_CODE = {
+    "english": "en",
+    "chinese": "zh",
+    "mandarin": "zh",
+    "cantonese": "yue",
+    "french": "fr",
+    "german": "de",
+    "italian": "it",
+    "japanese": "ja",
+    "korean": "ko",
+    "portuguese": "pt",
+    "russian": "ru",
+    "spanish": "es",
+    "arabic": "ar",
+}
+
+
+def parse_qwen3_asr_output(raw_text: str, fallback_language: str = "en") -> tuple[str, str]:
+    lang_match = re.match(r"language\s+(\w+)", raw_text, re.IGNORECASE)
+    if lang_match:
+        name = lang_match.group(1).lower()
+        language = _LANG_NAME_TO_CODE.get(name, name[:2])
+    else:
+        language = fallback_language
+
+    asr_match = re.search(r"<asr_text>(.*?)</asr_text>", raw_text, re.DOTALL)
+    text = asr_match.group(1).strip() if asr_match else raw_text.strip()
+
+    return language, text
 
 
 async def transcribe(
@@ -43,11 +74,8 @@ async def transcribe(
         raise RuntimeError(f"ASR backend error {resp.status_code}: {resp.text}")
 
     data = resp.json()
-    detected_language = data.get("language", language or "en")
-    full_text = data.get("text", "")
+    raw_text = data.get("text", "")
+    detected_language, clean_text = parse_qwen3_asr_output(raw_text, fallback_language=language or "en")
 
-    # llama.cpp json format returns flat text only — one segment, real timestamps
-    # come from ForcedAligner; duration placeholder filled by pipeline
-    segments = [{"text": full_text, "start": 0.0, "end": 0.0}]
-
+    segments = [{"text": clean_text, "start": 0.0, "end": 0.0}]
     return {"language": detected_language, "segments": segments}

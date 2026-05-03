@@ -22,6 +22,10 @@ class Settings(BaseSettings):
 
     disable_diarization: bool = False
 
+    asr_chunking_strategy: str = "auto"  # auto | always | never
+    asr_chunk_duration: int = 25
+    asr_chunk_threshold_seconds: int = 28
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
