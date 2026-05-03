@@ -84,6 +84,10 @@ async def run(
     )
     asr_segments = asr_result["segments"]
     detected_language = asr_result["language"]
+    audio_duration = len(audio_array) / sample_rate
+    for seg in asr_segments:
+        if seg["end"] == 0.0:
+            seg["end"] = round(audio_duration, 3)
 
     # 2. Align + diarize in parallel
     async def _align():

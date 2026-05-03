@@ -17,7 +17,7 @@ async def transcribe(
 
     form_data: dict = {
         "model": settings.asr_model_name,
-        "response_format": "verbose_json",
+        "response_format": "json",
     }
     if language:
         form_data["language"] = language
@@ -44,15 +44,10 @@ async def transcribe(
 
     data = resp.json()
     detected_language = data.get("language", language or "en")
-    raw_segments = data.get("segments", [])
+    full_text = data.get("text", "")
 
-    segments = [
-        {
-            "text": seg.get("text", ""),
-            "start": float(seg.get("start", 0.0)),
-            "end": float(seg.get("end", 0.0)),
-        }
-        for seg in raw_segments
-    ]
+    # llama.cpp json format returns flat text only — one segment, real timestamps
+    # come from ForcedAligner; duration placeholder filled by pipeline
+    segments = [{"text": full_text, "start": 0.0, "end": 0.0}]
 
     return {"language": detected_language, "segments": segments}
