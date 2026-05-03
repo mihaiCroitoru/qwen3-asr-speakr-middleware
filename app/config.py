@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     asr_model_name: str = "qwen3-asr-1.7b"
 
     hf_token: str = ""
-    pyannote_model: str = "pyannote/speaker-diarization-community-1"
+    pyannote_model: str = "pyannote/speaker-diarization-3.1"
 
     forced_aligner_model: str = "Qwen/Qwen3-ForcedAligner-0.6B"
     aligner_device: str = "cpu"

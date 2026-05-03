@@ -24,8 +24,8 @@ def _load_model():
     device = settings.aligner_device
 
     logger.info(f"Loading ForcedAligner: {model_id} on {device}")
-    _processor = AutoProcessor.from_pretrained(model_id)
-    _model = AutoModelForCTC.from_pretrained(model_id).to(device)
+    _processor = AutoProcessor.from_pretrained(model_id, trust_remote_code=True)
+    _model = AutoModelForCTC.from_pretrained(model_id, trust_remote_code=True).to(device)
     _model.eval()
     logger.info("ForcedAligner loaded")
     return _model, _processor
